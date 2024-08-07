@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package user;
+
+enum SelectOption {
+    GET = 0;
+    GET_ALL = 1;
+    REGISTER=2;
+    LOGIN=3;
+    CURRENT_USER=4;
+    REFRESH_TOKEN=5;
+    CREATE = 6;
+    UPDATE =7;
+    DELETE =8;
+}
+
+enum SelectService{
+    PAYMENT = 0;
+    ORDER = 1;
+}
+
+message User {
+    int32 id =1;
+    string user_id=2;
+    string username =3;
+    string email=4;
+    string password =5;
+    string access_token = 6;
+    string refresh_token = 7;
+    SelectService service = 8;
+    string error_message = 9;
+    SelectOption option =10;
+    int64 http_status_code = 11;
+    string shipping_address = 12;
+    int64 phone = 13;
+}
+
+
+message UserList {
+    repeated User users = 1;
+}

@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "app"
+version = "0.1.0"
+description = ""
+authors = ["NxtGen-Dev-ZAH <zaheer.ahmad.contact@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.111.1"
+uvicorn = "^0.30.3"
+protobuf = "^5.27.2"
+aiokafka = "^0.11.0"
+psycopg = "^3.2.1"
+pydantic = "^2.8.2"
+sqlmodel = "^0.0.21"
+python-multipart = "^0.0.9"
+passlib = "^1.7.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
