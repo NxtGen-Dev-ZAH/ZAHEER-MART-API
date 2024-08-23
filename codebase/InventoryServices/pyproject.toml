@@ -13,6 +13,7 @@ protobuf = "^5.27.2"
 aiokafka = "^0.11.0"
 pydantic = "^2.8.2"
 sqlmodel = "^0.0.21"
+psycopg = "^3.2.1"
 
 
 [build-system]

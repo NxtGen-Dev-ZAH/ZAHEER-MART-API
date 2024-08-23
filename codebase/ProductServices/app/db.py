@@ -1,5 +1,7 @@
-from sqlmodel import create_engine, SQLModel, Session
-from app import settings
+#db.py
+from sqlmodel import SQLModel, create_engine, Session
+from . import settings
+
 
 connection_string: str = str(settings.DATABASE_URL).replace(
     "postgresql", "postgresql+psycopg"
@@ -9,7 +11,8 @@ engine = create_engine(
     connection_string, connect_args={}, pool_recycle=300
 )
 
-def create_db_and_tables() -> None:
+
+def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
 def get_session():

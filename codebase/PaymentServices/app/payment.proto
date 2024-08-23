@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-package payment;
-
 enum SelectOption {
     GET = 0;
     GET_ALL = 1;
@@ -14,7 +12,10 @@ enum SelectOption {
     UPDATE =8;
     REDUCE = 9;
     DELETE =10;
+    PAYMENT_DONE = 11;
 }
+
+
 
 message Payment {
     int32 id =1;
@@ -34,6 +35,7 @@ message Payment {
     int64 http_status_code = 15;
     string error_message = 16;
 }
+
 
 enum SelectService{
     PAYMENT = 0;
@@ -87,6 +89,6 @@ message Order {
     int64 http_status_code = 18;
 }
 
-message payment {   
-    repeated Payment payment = 1;
+message OrderList {
+    repeated Order orders = 1;
 }

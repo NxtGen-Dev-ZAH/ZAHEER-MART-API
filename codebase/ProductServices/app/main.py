@@ -1,191 +1,108 @@
-from google.protobuf.json_format import MessageToDict
+# main.py
 from fastapi import FastAPI, Depends, HTTPException
-from contextlib import asynccontextmanager
-from typing import Annotated
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
-from app import settings, db, product_pb2, kafka, models
-from app.consumer import main
-from uuid import UUID
+from sqlmodel import Session
+from app import models, crud, kafka
+from app.producer import producer
+from app.consumer.main import start_consuming
+
+# from app.consumer.main import consume_message_for_stock_level_update
+from .db import get_session, create_db_and_tables
 import asyncio
+from contextlib import asynccontextmanager
 import logging
+from typing import Annotated
 
-
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-#  Function to consume list of all products from kafkatopic
-async def consume_message_response_get_all():
-    consumer = AIOKafkaConsumer(
-        f"{settings.KAFKA_TOPIC_GET}",
-        bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}",
-        group_id=f"{settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT_GET}",
-        auto_offset_reset="earliest",
-    )
-    await kafka.retry_async(consumer.start)
-    try:
-        async for msg in consumer:
-            logger.info(f"message from consumer : {msg}")
-            try:
-                new_msg = product_pb2.ProductList() 
-                new_msg.ParseFromString(msg.value)
-                logger.info(f"new_msg on producer side:{new_msg}")
-                return new_msg
-            except Exception as e:
-                logger.error(f"Error Processing Message: {e} ")
-    finally:
-        await consumer.stop()
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db.create_db_and_tables()
+    create_db_and_tables()
     await kafka.create_topic()
-    loop = asyncio.get_event_loop()
-    task1 = loop.create_task(main.consume_message_request())
-    task2 = loop.create_task(main.consume_message_for_stock_level_update())
+    consumer_task = asyncio.create_task(start_consuming())
+    # stock_task = loop.create_task(consume_message_for_stock_level_update())
     try:
         yield
     finally:
-        for task in [task1, task2]:
-            task.cancel()
-            await task
+        consumer_task.cancel()
+        try:
+            await consumer_task
+        except asyncio.CancelledError:
+            pass
 
 
-# Home Endpoint
-app: FastAPI = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan)
+
 
 
 @app.get("/")
-async def read_root():
-    return {"Hello": "Product Service"}
+async def main():
+    return "welcome to Product services "
 
 
-# Endpoint to get all the products
-@app.get("/products", response_model=list[models.Producttable])
-async def get_all_products(
-    producer: Annotated[AIOKafkaProducer, Depends(kafka.create_produce)]
+#  The Order Service will request product details from the Product Service during order creation.
+#  This communication will be synchronous using REST API (FastAPI).
+@app.get("/products/{product_id}/details", response_model=models.ProductBase)
+async def get_product_details(
+    product_id: str, session: Annotated[Session, Depends(get_session)]
 ):
-    product_proto = product_pb2.Product(option=product_pb2.SelectOption.GET_ALL)
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}", serialized_product)
-    product_list_proto = await consume_message_response_get_all()
-
-    product_list = [
-        {
-            "id": product.id,
-            "product_id": str(product.product_id),
-            "name": product.name,
-            "description": product.description,
-            "price": product.price,
-            "is_available": product.is_available,
-        }
-        for product in product_list_proto.products
-    ]
-    return product_list
+    db_product = await crud.get_product(session, product_id)
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return db_product
 
 
-#  Endpoint to get the single product based on endpoint
-@app.get("/product/{product_id}", response_model=dict)
-async def get_a_product(
-    product_id: UUID, producer: Annotated[AIOKafkaProducer, Depends(kafka.create_produce)]
+@app.get("/products/", response_model=list[models.ProductBase])
+async def read_products(session: Annotated[Session, Depends(get_session)]):
+    products = await crud.get_all_products(session)
+    return products
+
+@app.post("/products/", response_model=models.ProductBase)
+async def create_product(
+    product: models.ProductBase
 ):
-    product_proto = product_pb2.Product(
-        product_id=str(product_id), option=product_pb2.SelectOption.GET
-    )
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}", serialized_product)
-    product_proto = await kafka.consume_message_response()
-    if product_proto.error_message or product_proto.http_status_code:
-        raise HTTPException(
-            status_code=product_proto.http_status_code,
-            detail=product_proto.error_message,
-        )
-    else:
+    await producer.publish_product_created(product)
+    return product 
+    
 
-        return MessageToDict(product_proto)
-
-
-#  Endpoint to add product to database
-@app.post("/product", response_model=dict)
-async def add_product(
-    product: models.ProductCreate,
-    producer: Annotated[AIOKafkaProducer, Depends(kafka.create_produce)],
-):
-    product_proto = product_pb2.Product(
-        name=product.name,
-        description=product.description,
-        price=product.price,
-        is_available=product.is_available,
-        option=product_pb2.SelectOption.CREATE,
-    )
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}", serialized_product)
-    product_proto = await kafka.consume_message_response()
-    if product_proto.error_message or product_proto.http_status_code:
-        raise HTTPException(
-            status_code=product_proto.http_status_code,
-            detail=product_proto.error_message,
-        )
-    else:
-        product_return_from_db = {
-            "id": product_proto.id,
-            "product_id": str(product_proto.product_id),
-            "name": product_proto.name,
-            "description": product_proto.description,
-            "price": product_proto.price,
-            "is_available": product_proto.is_available,
-        }
-        return product_return_from_db
-        # or
-        # return MessageToDict(product_proto)
-
-
-#  Endpoint to update product to database
-@app.put("/product/{product_id}", response_model=dict)
+@app.patch("/products/{product_id}")
 async def update_product(
-    product_id: UUID,
+    product_id: str,
     product: models.ProductUpdate,
-    producer: Annotated[AIOKafkaProducer, Depends(kafka.create_produce)],
 ):
-    product_proto = product_pb2.Product(
-        product_id=str(product_id),
-        name=product.name,
-        description=product.description,
-        price=product.price,
-        is_available=product.is_available,
-        option=product_pb2.SelectOption.UPDATE,
-    )
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}", serialized_product)
-    product_proto = await kafka.consume_message_response()
-    if product_proto.error_message or product_proto.http_status_code:
-        raise HTTPException(
-            status_code=product_proto.http_status_code,
-            detail=product_proto.error_message,
-        )
-    else:
-        return {"Updated Message": MessageToDict(product_proto)}
+    await producer.publish_product_updated(product,product_id)    
+    return {"detail": f"Update request for product ID {product_id} has been sent."}
 
 
-#  Endpoint to delete product from database
-@app.delete("/product/{product_id}", response_model=dict)
+@app.delete("/products/{product_id}")
 async def delete_product(
-    product_id: UUID, producer: Annotated[AIOKafkaProducer, Depends(kafka.create_produce)]
+    product_id: str
 ):
-    product_proto = product_pb2.Product(
-        product_id=str(product_id), option=product_pb2.SelectOption.DELETE
-    )
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}", serialized_product)
-    product_proto = await kafka.consume_message_response()
-    logger.info(f"Complete Product Proto: {product_proto}")
-    if product_proto.message:
-        return {"Product Deleted ": product_proto.message}
-    elif product_proto.error_message or product_proto.http_status_code:
-        raise HTTPException(
-            status_code=product_proto.http_status_code,
-            detail=product_proto.error_message,
-        )
-    else:
-        return {"Product not deleted ": product_proto.error_message}
+    product=await producer.publish_product_deleted(product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return (f"Product with id {product_id}  is deleted : {product}")
+
+
+# @app.post("/products/{product_id}/update_stock")
+# async def update_product_stock(
+#     product_id: str, new_stock: int, session: Annotated[Session, Depends(get_session)]
+# ):
+#     db_product = await crud.update_product_stock(session, product_id, new_stock)
+#     if db_product is None:
+#         raise HTTPException(status_code=404, detail="Product not found")
+#     await producer.publish_stock_update(product_id, new_stock)
+#     return {"message": "Stock updated successfully"}
+
+# @app.post("/products/{product_id}/check_stock")
+# async def check_stock(product_id: str, quantity: int, session: Annotated[Session, Depends(get_session)]):
+#     db_product = await crud.get_product(session, product_id)
+#     if db_product is None:
+#         raise HTTPException(status_code=404, detail="Product not found")
+
+#     # Assuming we have a stock field in the Product model
+#     if db_product.stock >= quantity:
+#         return {"available": True, "message": "Sufficient stock available"}
+#     else:
+#         return {"available": False, "message": "Insufficient stock"}

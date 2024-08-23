@@ -141,6 +141,18 @@ services:
     network_mode: "service:payment-service"
     depends_on:
       - payment-service
+  
+  pgadmin:
+    image: dpage/pgadmin4:8.6
+    restart: always
+    container_name: PgAdmin4Cont4
+    ports:
+      - "8880:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=user@domain.com
+      - PGADMIN_DEFAULT_PASSWORD=SuperSecret
+    volumes:
+      - pgadmin:/var/lib/pgadmin
 
   # Databases
   postgres-user:
@@ -310,6 +322,8 @@ volumes:
   postgres_payment_data:
     driver: local
   postgres_notification_data:
+    driver: local
+  pgadmin:
     driver: local
 
 networks:

@@ -1,33 +1,24 @@
-from sqlmodel import SQLModel, Field
 from typing import Optional
-from decimal import Decimal
+from sqlmodel import SQLModel, Field
 
-
-class Producttable(SQLModel, table=True):
-    product_id: Optional[int] = Field(default=None, primary_key=True)
+class ProductBase(SQLModel):
+    product_id: str = Field(index=True, unique=True)
     name: str
     description: str
-    price: Decimal
-    is_available: bool
+    price: float
+    is_available: bool = True
+    category: Optional[str] = None
 
+class Product(ProductBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
 
-class ProductRead(SQLModel):
-    product_id: int
-    name: str
-    description: str
-    price: Decimal
-    is_available: bool
-
-
-class ProductCreate(SQLModel):
-    name: str
-    description: str
-    price: Decimal
-    is_available: bool
+class ProductCreate(ProductBase):
+    pass
 
 
 class ProductUpdate(SQLModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    price: Optional[Decimal] = None
+    price: Optional[float] = None
     is_available: Optional[bool] = None
+    category: Optional[str] = None

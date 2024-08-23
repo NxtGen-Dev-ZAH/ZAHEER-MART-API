@@ -1,15 +1,21 @@
+
+
 syntax = "proto3";
 
-package order;
-
 enum SelectOption {
-    CREATE = 0;
-    UPDATE = 1;
-    DELETE = 2;
-    GET = 3;
-    GET_ALL = 4;
+    GET = 0;
+    GET_ALL = 1;
+    ADD = 2;
+    REGISTER=3;
+    LOGIN=4;
+    CURRENT_USER=5;
+    REFRESH_TOKEN=6;
+    CREATE = 7;
+    UPDATE =8;
+    REDUCE = 9;
+    DELETE =10;
+    PAYMENT_DONE = 11;
 }
-
 
 message Payment {
     int32 id =1;
@@ -85,3 +91,14 @@ message Order {
 message OrderList {
     repeated Order orders = 1;
 }
+
+
+
+
+
+
+
+
+
+
+

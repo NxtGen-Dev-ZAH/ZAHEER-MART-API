@@ -1,83 +1,107 @@
+# kafka.py
 import asyncio
-from aiokafka import AIOKafkaConsumer,AIOKafkaProducer
-from aiokafka.admin import AIOKafkaAdminClient,NewTopic
-from app import settings , main,product_pb2
+from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+from aiokafka.admin import AIOKafkaAdminClient
+from aiokafka.admin import NewTopic
+from . import settings, models
+from app import product_pb2
+import json
+import logging
 
-async def retry_async(func, retries=5, delay=2, *args, **kwargs):
-    for attempt in range(retries):
-        try:
-            return await func(*args, **kwargs)
-        except Exception as e:
-            main.logger.error(f"Attempt {attempt + 1} failed: {e}")
-            if attempt < retries - 1:
-                await asyncio.sleep(delay)
-            else:
-                raise
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-async def create_topic ():
-    admin_client = AIOKafkaAdminClient(
-        bootstrap_servers= f"{settings.BOOTSTRAP_SERVER}"
-    )
-    await retry_async(admin_client.start)
+
+async def create_topic():
+    admin_client = AIOKafkaAdminClient(bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}")
+    await admin_client.start()
     topic_list = [
-        NewTopic(name=f"{(settings.KAFKA_TOPIC).strip()}", num_partitions=2, replication_factor=1),
-        NewTopic(name=f"{(settings.KAFKA_TOPIC_GET).strip()}", num_partitions=2, replication_factor=1)
+        NewTopic(
+            name=f"{(settings.KAFKA_TOPIC).strip()}",
+            num_partitions=2,
+            replication_factor=1,
+        ),
+        NewTopic(
+            name=f"{(settings.KAFKA_TOPIC_GET).strip()}",
+            num_partitions=2,
+            replication_factor=1,
+        ),
+        NewTopic(
+            name=f"{(settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK).strip()}",
+            num_partitions=2,
+            replication_factor=1,
+        ),
     ]
     try:
-        await admin_client.create_topics(new_topics=topic_list, validate_only= False)
+        await admin_client.create_topics(new_topics=topic_list, validate_only=False)
+        logger.info("Kafka topics created successfully")
     except Exception as e:
-        main.logger.error ( "Error creating topics:: {e}")
+        logger.error(f"Error creating topics: {e}")
     finally:
         await admin_client.close()
 
-async def consume_message_response_get_all():
-    consumer = AIOKafkaConsumer(
-        f"{settings.KAFKA_TOPIC_GET}",
-        bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}",
-        group_id=f"{settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT_GET}",
-        auto_offset_reset="earliest",
+
+def product_to_proto(product: models.ProductBase) -> product_pb2.Product:
+    return product_pb2.Product(
+        product_id=product.product_id,
+        name=product.name,
+        description=product.description,
+        price=product.price,
+        is_available=product.is_available,
+        category=product.category,
     )
-    await retry_async(consumer.start)
-    try:
-        async for msg in consumer:
-            main.logger.info(f"message from consumer : {msg}")
-            try:
-                new_msg = product_pb2.ProductList()
-                new_msg.ParseFromString(msg.value)
-                main.logger.info(f"new_msg on producer side:{new_msg}")
-                return new_msg
-            except Exception as e:
-                main.logger.error(f"Error Processing Message: {e} ")
-    finally:
-        await consumer.stop()
-
-async def consume_message_response():
-    consumer = AIOKafkaConsumer(
-        f"{settings.KAFKA_TOPIC_GET}",
-        bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}",
-        group_id=f"{settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT_GET}",
-        auto_offset_reset="earliest",
-    )
-    await retry_async(consumer.start)
-    try:
-        async for msg in consumer:
-            main.logger.info(f"message from consumer in producer  : {msg}")
-            try:
-                new_msg = product_pb2.Product()
-                new_msg.ParseFromString(msg.value)
-                main.logger.info(f"new_msg on producer side:{new_msg}")
-                return new_msg
-            except Exception as e:
-                main.logger.error(f"Error Processing Message: {e} ")
-    finally:
-        await consumer.stop()
 
 
-#  Function to produce message. I will work as a dependency injection for APIs
-async def create_produce():
-    producer = AIOKafkaProducer(bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}")
-    await retry_async(producer.start)
+async def send_kafka_message(topic: str, key: str, value: bytes):
+    producer = AIOKafkaProducer(bootstrap_servers=settings.BOOTSTRAP_SERVER)
+    await producer.start()
+    print("IN PRODUCER IT IS RECIEVING THIS  " + str(value))
     try:
-        yield producer
+        await producer.send_and_wait(topic, key=key.encode("utf-8"), value=value)
+        logger.info(f"Message sent to topic {topic}")
     finally:
         await producer.stop()
+
+
+async def consume_messages(topic: str, group_id: str):
+    consumer = AIOKafkaConsumer(
+        topic,
+        bootstrap_servers=settings.BOOTSTRAP_SERVER,
+        group_id=group_id,
+        auto_offset_reset="earliest",
+    )
+    await retry_async(consumer.start())
+    try:
+        logger.info("Consumer started, awaiting messages...")
+        logger.info("This is kafka consumer ")
+        logger.info(consumer)
+        async for msg in consumer:
+            logger.info(f"Message received from Kafka: {msg.value}")
+            try:
+                new_msg = product_pb2.Product()
+                logger.info(f"Raw message from Kafka (before parsing): {msg.value}")
+                new_msg.ParseFromString(msg.value)
+                logger.info(f"Parsed message on consumer side: {new_msg}")
+                yield new_msg
+                for field in new_msg.DESCRIPTOR.fields:
+                    value = getattr(new_msg, field.name)
+                    logger.info(f"Field {field.name}: {value}")
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+                logger.error(f"Failed to parse message: {msg.value}")
+
+    finally:
+        await consumer.stop()
+
+
+async def retry_async(coro, max_retries=3, delay=1):
+    for attempt in range(max_retries):
+        try:
+            return await coro
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise
+            logger.warning(
+                f"Attempt {attempt + 1} failed: {e}. Retrying in {delay} seconds..."
+            )
+            await asyncio.sleep(delay)

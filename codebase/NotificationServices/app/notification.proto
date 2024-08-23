@@ -1,20 +1,88 @@
 syntax = "proto3";
 
-package notification;
-
 enum SelectOption {
     GET = 0;
     GET_ALL = 1;
     ADD = 2;
-    REGISTER = 3;
-    LOGIN = 4;
-    CURRENT_USER = 5;
-    REFRESH_TOKEN = 6;
+    REGISTER=3;
+    LOGIN=4;
+    CURRENT_USER=5;
+    REFRESH_TOKEN=6;
     CREATE = 7;
-    UPDATE = 8;
+    UPDATE =8;
     REDUCE = 9;
-    DELETE = 10;
+    DELETE =10;
     PAYMENT_DONE = 11;
+}
+
+enum SelectService{
+    PAYMENT = 0;
+    ORDER = 1;
+}
+
+
+message User {
+    int32 id =1;
+    string user_id=2;
+    string username =3;
+    string email=4;
+    string password =5;
+    string access_token = 6;
+    string refresh_token = 7;
+    SelectService service = 8;
+    string error_message = 9;
+    SelectOption option =10;
+    int64 http_status_code = 11;
+}
+
+message Inventory {
+    int32 id =1;
+    string product_id=2;
+    string inventory_id =3;
+    int64 stock_level = 4;
+    int64 add_stock_level = 5;
+    int64 reduce_stock_level = 6;
+    int64 reserved_stock = 7;
+    string name = 8;
+    string description =9;
+    float price =10;
+    bool is_available = 11;
+    string error_message = 12;
+    SelectOption option =13;
+    int64 http_status_code = 14;
+}
+
+message Payment {
+    int32 id =1;
+    string payment_id=2;
+    string order_id =3;
+    string user_id=4;
+    string username =5;
+    string email=6;
+    string password =7;
+    float amount = 8;
+    int64 card_number = 9;
+    int32 exp_month = 10;
+    int32 exp_year = 11;
+    int32 cvc = 12;
+    PaymentStatus payment_status = 13;
+    SelectOption option =14;
+    int64 http_status_code = 15;
+    string error_message = 16;
+}
+
+
+message Product {
+    int32 id =1;
+    string product_id=2;
+    string name = 3;
+    string description =4;
+    float price =5;
+    bool is_available = 6;
+    string message = 7;
+    string error_message = 8;
+    SelectOption option =9;
+    int64 http_status_code = 10;
 }
 
 enum OrderStatus {
@@ -29,54 +97,29 @@ enum PaymentStatus {
 }
 
 message Order {
-    int32 id = 1;
-    string order_id = 2;
-    string product_id = 3;
+    int32 id =1;
+    string order_id=2;
+    string product_id =3;
     string user_id = 4;
-    string username = 5;
-    string email = 6;
-    int64 quantity = 7;
+    string username =5;
+    string email=6;
+    int64 quantity= 7;
     string shipping_address = 8;
     string customer_notes = 9;
     int64 stock_level = 10;
     bool is_product_available = 11;
-    bool is_stock_available = 12;
+    bool is_stock_available  = 12;
     string message = 13;
     string error_message = 14;
     OrderStatus order_status = 15;
     PaymentStatus payment_status = 16;
-    SelectOption option = 17;
+    SelectOption option =17;
     int64 http_status_code = 18;
 }
 
-message Payment {
-    int32 id = 1;
-    string payment_id = 2;
-    string order_id = 3;
-    string user_id = 4;
-    string username = 5;
-    string email = 6;
-    string password = 7;
-    float amount = 8;
-    int64 card_number = 9;
-    int32 exp_month = 10;
-    int32 exp_year = 11;
-    int32 cvc = 12;
-    PaymentStatus payment_status = 13;
-    SelectOption option = 14;
-    int64 http_status_code = 15;
-    string error_message = 16;
-}
 
-message User {
-    int32 id = 1;
-    string user_id = 2;
-    string username = 3;
-    string email = 4;
-    string password = 5;
-    string access_token = 6;
-    string refresh_token = 7;
-    SelectOption option = 8;
-    string error_message = 9;
-    int64 http_status_code = 10;
+
+
+message UserList {
+    repeated User users = 1;
 }
