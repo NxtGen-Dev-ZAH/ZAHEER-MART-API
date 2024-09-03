@@ -1,137 +1,150 @@
-from sqlmodel import SQLModel, Field, create_engine, select, Session
-from app import settings, payment_pb2,db, model
-from app.stripe import payment
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
-import asyncio
-import logging
-import uuid
-from uuid import UUID
+from app.stripe.payment import create_payment
+from sqlmodel import  select, Session
+from app import  crud, kafka, settings, payment_pb2, db, models
+from app.payment_pb2 import Payment, PaymentStatus
+from app.models import Payment,PaymentRequest
 
+import logging
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-
-# Retry utility
-
-
-#  Functions to produce message based on topic name and message 
-async def produce_message(topic, message):
-    producer = AIOKafkaProducer(bootstrap_servers=settings.BOOTSTRAP_SERVER)
-    await retry_async(producer.start)
-    try:
-        await producer.send_and_wait(topic, message)
-    finally:
-        await producer.stop()
+# async def handle_order_payment(order_id: str):
+#     with Session(db.engine) as session:
+#         created_product = await crud.create_product_crud(session, order_id)
+#         return created_product
 
 
-#  Function to consume message from the APIs on the producer side and perform functionalities according to the request made by APIs 
-async def consume_message_request():
-    consumer = AIOKafkaConsumer(
-        settings.KAFKA_TOPIC,
-        bootstrap_servers=settings.BOOTSTRAP_SERVER,
-        group_id=settings.KAFKA_CONSUMER_GROUP_ID_FOR_PAYMENT,
-        auto_offset_reset='earliest'
+async def process_order_message(message):
+    if message.option == payment_pb2.SelectOption.CREATE:
+        await handle_create_order(message)
+    elif message.option == payment_pb2.SelectOption.DELETE:
+        await handle_delete_order(message)
+
+async def handle_create_order(message):
+    payment = models.PAYMENTmodel(
+        order_id=(message.order_id),
+        user_id=(message.user_id),
     )
-    await retry_async(consumer.start)
-    try:
-        async for msg in consumer:
-            new_msg = payment_pb2.Payment()
-            new_msg.ParseFromString(msg.value)
-            logger.info(f"Received message: {new_msg}")
-            if new_msg.amount is None:
-                new_msg.amount = 0
+    with Session(db.engine) as session:
+        session.add(payment)
+        session.commit()
 
-            logger.info(f"new_msg.amount: {new_msg.amount}")
-            payment_request = model.PaymentRequest(
-                amount =new_msg.amount,
-                card_number = new_msg.card_number,
-                exp_month = new_msg.exp_month,
-                exp_year = new_msg.exp_year,
-                cvc  = new_msg.cvc,
-                order_id = str(new_msg.order_id),
-            )
-            with Session(db.engine) as session:
-                select_order = session.exec(select(model.Payment).where(model.Payment.order_id == uuid.UUID(new_msg.order_id))).first()
-                if select_order:
-                    payment_response = await payment.create_payment(payment_request)
-                    if select_order.payment_status == "Payment Done":
-                        payment_proto = payment_pb2.Payment(
-                                error_message=f"Payment Already Done",
-                            )
-                        serialized_payment = payment_proto.SerializeToString()
-                        await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
-                    else:    
-                        if payment_response == payment_pb2.PaymentStatus.PAID:
-                            select_order.payment_status = "Payment Done"
-                            session.add(select_order)
-                            session.commit()
-                            payment_proto = payment_pb2.Payment(
-                                user_id = str(new_msg.user_id),
-                                order_id = str(select_order.order_id),
-                                username = new_msg.username,
-                                email = new_msg.email,
-                                payment_status = payment_pb2.PaymentStatus.PAID
-                            )
-                            serialized_payment = payment_proto.SerializeToString()
-                            await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
-                        else:
-                            select_order.payment_status = "Payment Failed"
-                            session.add(select_order)
-                            session.commit()
+async def handle_delete_order(message):
+    with Session(db.engine) as session:
+        payment =crud.get_order(session,message.order_id)
+        if payment:
+            session.delete(payment)
+            session.commit()
 
-                            payment_proto = payment_pb2.Payment(
-                                order_id = str(payment.order_id),
-                                payment_status = payment_pb2.PaymentStatus.FAILED
-                            )
-                            serialized_payment = payment_proto.SerializeToString()
-                            await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
-                else:
-                    payment_proto = payment_pb2.Payment(
-                        error_message = "You haven't placed any order yet"
+async def process_message(message):
+    payment_request = create_payment_request(message)
 
-                    )
-                    serialized_payment = payment_proto.SerializeToString()
-                    await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
-                    
-    except Exception as e:
-        logger.error(f"Error processing message: {e}")
-    finally:
-        await consumer.stop()
+    with Session(db.engine) as session:
+        select_order = crud.get_order(session,message.order_id)
+        
+        if select_order:
+            await handle_existing_payment(select_order, payment_request, message, session)
+        else:
+            await handle_missing_order(message)
 
+def create_payment_request(message):
+    if message.amount is None:
+        message.amount = 0
 
-
-#  Function to consume message from the create product API on the producer side of product service  and update product with id in inventory service 
-async def consume_message_from_create_order():
-    consumer = AIOKafkaConsumer(
-        f"{(settings.KAFKA_TOPIC_GET_FROM_ORDER).strip()}",
-        bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}",
-        group_id=f"{(settings.KAFKA_CONSUMER_GROUP_ID_FOR_ORDER)}",
-        auto_offset_reset='earliest'
+    return PaymentRequest(
+        amount=message.amount,
+        card_number=message.card_number,
+        exp_month=message.exp_month,
+        exp_year=message.exp_year,
+        cvc=message.cvc,
+        order_id=str(message.order_id),
     )
-    await retry_async(consumer.start)
+
+async def handle_existing_payment(select_order, payment_request, message, session):
+    payment_response = await create_payment(payment_request)
+
+    if select_order.payment_status == "Payment Done":
+        await send_duplicate_payment_message(message)
+    else:
+        await update_payment_status(select_order, payment_response, message, session)
+
+async def handle_missing_order(message):
+    payment_proto = payment_pb2.Payment(
+        error_message="You haven't placed any order yet"
+    )
+    serialized_message = payment_proto.SerializeToString()
+    await kafka.send_kafka_message(
+        settings.KAFKA_TOPIC_PAYMENT, serialized_message
+    )
+
+async def send_duplicate_payment_message(message):
+    payment_proto = payment_pb2.Payment(
+        error_message=f"Payment Already Done",
+    )
+    serialized_message = payment_proto.SerializeToString()
+    await kafka.send_kafka_message(
+        settings.KAFKA_TOPIC_PAYMENT, serialized_message
+    )
+
+async def update_payment_status(select_order, payment_response, message, session):
+    if payment_response == PaymentStatus.PAID:
+        select_order.payment_status = "Payment Done"
+        session.add(select_order)
+        session.commit()
+        await send_success_payment_message(select_order, message)
+    else:
+        select_order.payment_status = "Payment Failed"
+        session.add(select_order)
+        session.commit()
+        await send_failed_payment_message(select_order)
+
+async def send_success_payment_message(select_order, message):
+    payment_proto = payment_pb2.Payment(
+        user_id=str(message.user_id),
+        order_id=str(select_order.order_id),
+        username=message.username,
+        email=message.email,
+        payment_status=PaymentStatus.PAID,
+    )
+    serialized_message = payment_proto.SerializeToString()
+    await kafka.send_kafka_message(
+        settings.KAFKA_TOPIC_PAYMENT, serialized_message
+    )
+
+async def send_failed_payment_message(select_order):
+    payment_proto = payment_pb2.Payment(
+        order_id=str(select_order.order_id),
+        payment_status=PaymentStatus.FAILED,
+    )
+    serialized_message = payment_proto.SerializeToString()
+    await kafka.send_kafka_message(
+        settings.KAFKA_TOPIC_PAYMENT, serialized_message
+    )
+
+
+async def start_consuming():
     try:
-        async for msg in consumer:
-            logger.info(f"Received message: {msg}")
-            new_msg = payment_pb2.Order()
-            new_msg.ParseFromString(msg.value)
-            logger.info(f"Received msg.value: {new_msg}")
-            if new_msg.option == payment_pb2.SelectOption.CREATE:
-                payment = model.Payment(
-                    order_id = uuid.UUID(new_msg.order_id),
-                    user_id = uuid.UUID(new_msg.user_id)
-                )
-                with Session(db.engine) as session:
-                    session.add(payment)
-                    session.commit()
-            elif new_msg.option == payment_pb2.SelectOption.DELETE:
-                with Session(db.engine) as session:
-                    payment = session.exec(select(model.Payment).where(model.Payment.order_id == new_msg.order_id)).first()
-                    if payment:
-                        session.delete(payment)
-                        session.commit()               
+        async for message in kafka.consume_messages(
+            settings.KAFKA_TOPIC_PAYMENT, settings.KAFKA_CONSUMER_GROUP_ID_FOR_PAYMENT
+        ):
+            await process_message(message)
     except Exception as e:
-        logger.error(f"Error processing message: {e}")
-    finally:
-        await consumer.stop()
+        logger.error(f"Error in consumer: {e}")
+
+async def start_order_consumer():
+    try:
+        async for message in kafka.consume_messages_order(
+            settings.KAFKA_TOPIC_GET_FROM_ORDER,
+            settings.KAFKA_CONSUMER_GROUP_ID_FOR_ORDER
+        ):
+            await process_order_message(message)
+    except Exception as e:
+        logger.error(f"Error in order consumer: {e}")
+
+async def consume_user_service_response():
+    return await kafka.consume_message_from_user_service()
+
+async def consume_payment_response():
+    return await kafka.consume_message_response_get()

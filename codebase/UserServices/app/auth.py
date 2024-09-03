@@ -3,7 +3,7 @@ from app import db,settings
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from typing import Annotated
-from app.models import User
+from app.models import UserClass
 from sqlmodel import  Session, select
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
@@ -25,14 +25,7 @@ def verify_password(password, hash_password):
 
 #  Check user in database
 
-def check_user_in_db(username: str|None, email:str|None):
-    with Session(db.engine) as session:
-        user = session.exec(select(User).where(User.username == username)).first()
-        if not user:
-            user = session.exec(select(User).where(User.email == email)).first()
-            if user:
-                return user
-        return user
+
 
 #  Genereate access_token
 def generate_token(data: dict, expires_delta: timedelta|None):

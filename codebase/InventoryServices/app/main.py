@@ -119,5 +119,5 @@ async def update_stock_level(
 
 @app.put("/inventory/{product_id}/reduce", response_model=models.InventoryItemBase)
 async def reduce_stock_level(product_id: str, quantity_change: int):
-    await producer.publish_inventory_reduce(str(product_id), quantity_change)
+    await producer.publish_inventory_reduce(product_id, quantity_change)
     return {"message": "Stock reduced successfully"}

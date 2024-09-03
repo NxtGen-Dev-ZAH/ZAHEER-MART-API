@@ -3,7 +3,8 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel import Session
 from app import models, crud, kafka
 from app.producer import producer
-from app.consumer.main import start_consuming
+from app.consumer.main import start_consuming, start_consuming_stock
+
 
 # from app.consumer.main import consume_message_for_stock_level_update
 from .db import get_session, create_db_and_tables
@@ -20,30 +21,31 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     await kafka.create_topic()
-    consumer_task = asyncio.create_task(start_consuming())
-    # stock_task = loop.create_task(consume_message_for_stock_level_update())
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(start_consuming())
+    stock_task = loop.create_task(start_consuming_stock())
     try:
         yield
     finally:
-        consumer_task.cancel()
-        try:
-            await consumer_task
-        except asyncio.CancelledError:
-            pass
+        for consumer in [task, stock_task]:
+            consumer.cancel()
+            try:
+                await consumer
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(lifespan=lifespan)
 
 
-
 @app.get("/")
 async def main():
-    return "welcome to Product services "
+    return "welcome to Product services "   
 
 
 #  The Order Service will request product details from the Product Service during order creation.
 #  This communication will be synchronous using REST API (FastAPI).
-@app.get("/products/{product_id}/details", response_model=models.ProductBase)
+@app.get("/products/{product_id}/details", response_model=models.Product)
 async def get_product_details(
     product_id: str, session: Annotated[Session, Depends(get_session)]
 ):
@@ -58,31 +60,28 @@ async def read_products(session: Annotated[Session, Depends(get_session)]):
     products = await crud.get_all_products(session)
     return products
 
+
 @app.post("/products/", response_model=models.ProductBase)
-async def create_product(
-    product: models.ProductBase
-):
+async def create_product(product: models.ProductBase):
     await producer.publish_product_created(product)
-    return product 
-    
+    return product
+
 
 @app.patch("/products/{product_id}")
 async def update_product(
     product_id: str,
     product: models.ProductUpdate,
 ):
-    await producer.publish_product_updated(product,product_id)    
+    await producer.publish_product_updated(product, product_id)
     return {"detail": f"Update request for product ID {product_id} has been sent."}
 
 
 @app.delete("/products/{product_id}")
-async def delete_product(
-    product_id: str
-):
-    product=await producer.publish_product_deleted(product_id)
+async def delete_product(product_id: str):
+    product = await producer.publish_product_deleted(product_id)
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    return (f"Product with id {product_id}  is deleted : {product}")
+    return f"Product with id {product_id}  is deleted : {product}"
 
 
 # @app.post("/products/{product_id}/update_stock")

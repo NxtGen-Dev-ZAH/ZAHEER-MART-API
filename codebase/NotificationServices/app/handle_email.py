@@ -8,7 +8,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-
 async def send_email(body: str, subject: str, user_email: str):
     try:
         sender_email = settings.FROM_EMAIL

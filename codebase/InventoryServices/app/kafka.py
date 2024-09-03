@@ -42,6 +42,16 @@ async def send_kafka_message(topic: str, key: str, value: bytes):
         logger.info(f"Message sent to topic {topic}")
     finally:
         await producer.stop()
+async def send_producer_message(topic: str, message:str):
+    producer = AIOKafkaProducer(bootstrap_servers=settings.BOOTSTRAP_SERVER)
+    await retry_async(producer.start())
+    try:
+        await producer.send_and_wait(
+            topic, message
+        )
+        logger.info(f"Message sent to topic {topic}")
+    finally:
+        await producer.stop()
 
 async def consume_messages(topic: str, group_id: str):
     consumer = AIOKafkaConsumer(
@@ -84,6 +94,7 @@ async def consume_messages_product(topic: str, group_id: str):
                 logger.error(f"Error processing message: {e}")
     finally:
         await consumer.stop()
+        
 async def consume_messages_inventory_check(topic: str, group_id: str):
     consumer = AIOKafkaConsumer(
         topic,

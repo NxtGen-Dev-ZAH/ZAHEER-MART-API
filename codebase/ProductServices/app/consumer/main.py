@@ -52,43 +52,34 @@ async def process_message(product: product_pb2.Product):
 async def start_consuming():
     try:
         async for message in kafka.consume_messages(
-            settings.KAFKA_TOPIC, settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT
+            settings.KAFKA_TOPIC_PRODUCT, settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT
         ):
             await process_message(message)
     except Exception as e:
         logger.error(f"Error in consumer: {e}")
 
 
-# async def consume_message_for_stock_level_update():
-#     try:
-#         async for message in kafka.consume_messages(
-#             settings.KAFKA_TOPIC, settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT
-#         ):
-#             await process_message(message)
-#     except Exception as e:
-#         logger.error(f"Error in consumer: {e}")
+async def process_message_stock(new_msg: product_pb2.Inventory):
+    with Session(db.engine) as session:
+        product = await crud.get_product(session, new_msg.product_id)
+        if product is not None:
+            if new_msg.stock_level <= 0:
+                product.is_available = False
+            elif new_msg.stock_level > 0:
+                product.is_available = True
+                session.add(product)
+                session.commit()
 
-#     await retry_async(consumer.start)
-#     try:
-#         async for msg in consumer:
-#             new_msg = product_pb2.Inventory()
-#             new_msg.ParseFromString(msg.value)
-#             logger.info(f"Received message: {new_msg}")
-#             with Session(db.engine) as session:
-#                 product = session.exec(
-#                     select(Product).where(Product.product_id == new_msg.product_id)
-#                 ).first()
-#                 if new_msg.stock_level <= 0:
-#                     product.is_available = False
-#                 elif new_msg.stock_level > 0:
-#                     product.is_available = True
-#                 session.add(product)
-#                 session.commit()
 
-#     except Exception as e:
-#         logger.error(f"Error processing message: {e}")
-#     finally:
-#         await consumer.stop()
+async def start_consuming_stock():
+    try:
+        async for message in kafka.consume_messages_stock(
+            settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK,
+            settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT,
+        ):
+            await process_message_stock(message)
+    except Exception as e:
+        logger.error(f"Error in consumer: {e}")
 
 
 if __name__ == "__main__":

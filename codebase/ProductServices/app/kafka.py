@@ -17,12 +17,7 @@ async def create_topic():
     await admin_client.start()
     topic_list = [
         NewTopic(
-            name=f"{(settings.KAFKA_TOPIC).strip()}",
-            num_partitions=2,
-            replication_factor=1,
-        ),
-        NewTopic(
-            name=f"{(settings.KAFKA_TOPIC_GET).strip()}",
+            name=f"{(settings.KAFKA_TOPIC_PRODUCT).strip()}",
             num_partitions=2,
             replication_factor=1,
         ),
@@ -72,20 +67,35 @@ async def consume_messages(topic: str, group_id: str):
     )
     await retry_async(consumer.start())
     try:
-        logger.info("Consumer started, awaiting messages...")
-        logger.info("This is kafka consumer ")
-        logger.info(consumer)
         async for msg in consumer:
-            logger.info(f"Message received from Kafka: {msg.value}")
             try:
                 new_msg = product_pb2.Product()
-                logger.info(f"Raw message from Kafka (before parsing): {msg.value}")
                 new_msg.ParseFromString(msg.value)
                 logger.info(f"Parsed message on consumer side: {new_msg}")
                 yield new_msg
-                for field in new_msg.DESCRIPTOR.fields:
-                    value = getattr(new_msg, field.name)
-                    logger.info(f"Field {field.name}: {value}")
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+                logger.error(f"Failed to parse message: {msg.value}")
+
+    finally:
+        await consumer.stop()
+
+
+async def consume_messages_stock(topic: str, group_id: str):
+    consumer = AIOKafkaConsumer(
+        topic,
+        bootstrap_servers=settings.BOOTSTRAP_SERVER,
+        group_id=group_id,
+        auto_offset_reset="earliest",
+    )
+    await retry_async(consumer.start())
+    try:
+        async for msg in consumer:
+            try:
+                new_msg = product_pb2.Inventory()
+                new_msg.ParseFromString(msg.value)
+                logger.info(f"Parsed message on consumer side: {new_msg}")
+                yield new_msg
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
                 logger.error(f"Failed to parse message: {msg.value}")

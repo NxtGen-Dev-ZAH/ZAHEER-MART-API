@@ -4,18 +4,26 @@ from typing import Optional
 from fastapi import Form 
 from typing import Annotated
 
-class User(SQLModel,table=True):
-    user_id: Optional[int] = Field(default=None, primary_key=True)
-    username: str = Field(unique=True)
-    email: str = Field(unique=True)
-    password: str
+
+class UserCreate(SQLModel):
+    username: str = Field(unique=True,index = True)
+    email: str = Field(unique=True,index = True)
+    password: str = Field(index = True)
     shipping_address: str
     phone:int
 
-class UserCreate(SQLModel):
-    username: str
-    email: str
-    password: str
+class USERLOGIN(SQLModel):
+      username: str 
+      password: str
+
+class Usertoken(SQLModel):
+      username: str 
+      email: str
+
+class UserClass(UserCreate,table=True):
+    user_id: Optional[int] = Field(default=None, primary_key=True,unique=True)
+
+
 
 class Token(BaseModel):
     access_token: str
