@@ -17,6 +17,7 @@ sqlmodel = "^0.0.21"
 python-multipart = "^0.0.9"
 passlib = "^1.7.4"
 stripe = "^10.9.0"
+python-jose = "^3.3.0"
 
 
 [build-system]

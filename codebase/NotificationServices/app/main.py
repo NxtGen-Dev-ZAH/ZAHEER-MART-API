@@ -9,6 +9,7 @@ from app.db import create_table
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 #  It contains all the instructions that will run when the application will start
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,14 +21,15 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        for task in [task1,task2,task3]:
+        for task in [task1, task2, task3]:
             task.cancel()
             try:
                 await task
             except asyncio.CancelledError:
                 pass
-            
-app:FastAPI = FastAPI(lifespan=lifespan )
+
+
+app: FastAPI = FastAPI(lifespan=lifespan)
 
 
 @app.get("/")

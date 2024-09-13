@@ -1,3 +1,4 @@
+from typing import Union
 from sqlmodel import select, Session
 from app import settings, user_pb2, db, kafka, auth, models, crud
 from aiokafka import AIOKafkaConsumer
@@ -12,27 +13,27 @@ logger = logging.getLogger(__name__)
 
 
 async def check_user_in_db(username: str, email: str):
+    logger.info("Checking user in DATABASE ")
     with Session(db.engine) as session:
         user = await crud.get_user_by_username(session, username)
         if not user:
-            user = crud.get_user_by_email(session, email)
-        return user
+            user = await crud.get_user_by_email(session, email)
+            return user
+        if user:
+            logger.info("user with username is found in the database")
+            return user
+        else:
+            return None
 
 
 async def handle_register_user(new_msg):
-    user = check_user_in_db(new_msg.username, new_msg.email)
+    user = await check_user_in_db(new_msg.username, new_msg.email)
     if user:
-        # user_proto = user_pb2.User(
-        #     error_message="User with these credentials already exists in database",
-        #     http_status_code=409,
-        # )
-        # serialized_user = user_proto.SerializeToString()
-        # await kafka.send_message(settings.KAFKA_TOPIC_USER, serialized_user)
         logger.info(f"User with these credentials already exists in database")
         return user
 
     else:
-        user = models.UserCreate(
+        user = models.UserClass(
             username=new_msg.username,
             email=new_msg.email,
             password=auth.hash_password(new_msg.password),
@@ -44,24 +45,12 @@ async def handle_register_user(new_msg):
             session.commit()
             logger.info(f"User added to database: {user}")
             session.refresh(user)
-            # user_proto = user_pb2.User(
-            #     id=user.id,
-            #     user_id=str(user.user_id),
-            #     username=user.username,
-            #     email=user.email,
-            #     password=user.password,
-            #     shipping_address=user.shipping_address,
-            #     phone=user.phone,
-            #     option=user_pb2.SelectOption.REGISTER,
-            # )
-            # serialized_user = user_proto.SerializeToString()
-            # await kafka.send_message(settings.KAFKA_TOPIC_USER_GET, serialized_user)
             logger.info(f"User added to database and sent back: {user}")
 
 
 async def handle_login(new_msg):
     user = await check_user_in_db(new_msg.username, new_msg.password)
-    if user:
+    if user is not None:
         if auth.verify_password(new_msg.password, user.password):
             expire_time = timedelta(minutes=settings.JWT_EXPIRY_TIME)
             access_token = auth.generate_token(
@@ -77,6 +66,11 @@ async def handle_login(new_msg):
                 refresh_token=refresh_token,
                 option=user_pb2.SelectOption.LOGIN,
             )
+            logger.info(
+                "================== User logged in this is his credentials =============",
+                user_proto,
+            )
+
             serialized_user = user_proto.SerializeToString()
             if new_msg.service == user_pb2.SelectService.PAYMENT:
                 await kafka.send_message(
@@ -206,8 +200,32 @@ async def handle_refresh_token(new_msg):
         logger.info(f"User verified and email sent back: {user_proto}")
 
 
+async def handle_delete_user(userid: Union[str, int]):
+    userid = int(userid)
+    with Session(db.engine) as session:
+        user = await crud.get_user_id(session, userid)
+        logger.info(f"User with id: {userid} deleted")
+        if user:
+            session.delete(user)
+            session.commit()
+            logger.info(f"User with id: {userid } deleted")
+
+        #     user_proto = user_pb2.User(
+        #         message="User deleted successfully", option=user_pb2.SelectOption.DELETE
+        #     )
+        # else:
+        #     user_proto = user_pb2.User(
+        #         error_message="User not found", http_status_code=404
+        #     )
+        # serialized_user = user_proto.SerializeToString()
+        # await kafka.send_message(settings.KAFKA_TOPIC_USER, serialized_user)
+        # logger.info(f"User deleted and confirmation sent back: {user_proto}")
+
+
 async def process_message(new_msg: user_pb2.User):
     try:
+        logger.info(f"Received message: {new_msg}")
+
         if new_msg.option == user_pb2.SelectOption.REGISTER:
             await handle_register_user(new_msg)
         elif new_msg.option == user_pb2.SelectOption.LOGIN:
@@ -216,6 +234,9 @@ async def process_message(new_msg: user_pb2.User):
             await handle_verify_user(new_msg)
         elif new_msg.option == user_pb2.SelectOption.REFRESH_TOKEN:
             await handle_refresh_token(new_msg)
+        elif new_msg.option == user_pb2.SelectOption.DELETE:
+            logger.info("Deleting inside the consumer")
+            await handle_delete_user(new_msg.user_id)
         else:
             logger.warning(f"Unknown option received: {new_msg.option}")
     except Exception as e:
@@ -224,9 +245,11 @@ async def process_message(new_msg: user_pb2.User):
 
 async def start_consuming():
     try:
-        async for message in kafka.consume_messages_user(
+        consumer = kafka.consume_messages_user(
             settings.KAFKA_TOPIC_USER, settings.KAFKA_CONSUMER_GROUP_ID_FOR_USER
-        ):
+        )
+        logger.info("Consumer started")
+        async for message in consumer:
             await process_message(message)
     except Exception as e:
         logger.error(f"Error in consumer: {e}")
@@ -318,29 +341,9 @@ async def start_consuming():
 #         logger.info(f"User updated and sent back: {user_proto}")
 
 
-# async def handle_delete_user(new_msg):
-#     with Session(db.engine) as session:
-#         user = session.exec(
-#             select(models.User).where(models.User.user_id == new_msg.user_id)
-#         ).first()
-#         if user:
-#             session.delete(user)
-#             session.commit()
-#             user_proto = user_pb2.User(
-#                 message="User deleted successfully", option=user_pb2.SelectOption.DELETE
-#             )
-#         else:
-#             user_proto = user_pb2.User(
-#                 error_message="User not found", http_status_code=404
-#             )
-#         serialized_user = user_proto.SerializeToString()
-#         await kafka.send_message(settings.KAFKA_TOPIC_USER_GET, serialized_user)
-#         logger.info(f"User deleted and confirmation sent back: {user_proto}")
 # elif new_msg.option == user_pb2.SelectOption.CREATE:
 #     await handle_create_user(new_msg)
 # elif new_msg.option == user_pb2.SelectOption.READ:
 #     await handle_read_user(new_msg)
 # elif new_msg.option == user_pb2.SelectOption.UPDATE:
 #     await handle_update_user(new_msg)
-# elif new_msg.option == user_pb2.SelectOption.DELETE:
-#     await handle_delete_user(new_msg)

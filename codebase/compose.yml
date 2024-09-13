@@ -1,5 +1,5 @@
-version: "3.8"
-name: zaheercomposefile
+# version: "3.8"
+# name: zaheercomposefile
 
 services:
   # Microservices
@@ -141,18 +141,18 @@ services:
     network_mode: "service:payment-service"
     depends_on:
       - payment-service
-  
-  pgadmin:
-    image: dpage/pgadmin4:8.6
-    restart: always
-    container_name: PgAdmin4Cont4
-    ports:
-      - "8880:80"
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=user@domain.com
-      - PGADMIN_DEFAULT_PASSWORD=SuperSecret
-    volumes:
-      - pgadmin:/var/lib/pgadmin
+
+  # pgadmin
+  #   image: dpage/pgadmin4:8.6
+  #   restart: always
+  #   container_name: PgAdmin4Cont4
+  #   ports:
+  #     - "8880:80"
+  #   environment:
+  #     - PGADMIN_DEFAULT_EMAIL=user@domain.com
+  #     - PGADMIN_DEFAULT_PASSWORD=SuperSecret
+  #   volumes:
+  #     - pgadmin:/var/lib/pgadmin
 
   # Databases
   postgres-user:
@@ -165,7 +165,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - postgres_user_data:/var/lib/postgresql/data
+      - postgres-user:/var/lib/postgresql/data
     networks:
       - backend
 
@@ -179,7 +179,7 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - postgres_product_data:/var/lib/postgresql/data
+      - postgres-product:/var/lib/postgresql/data
     networks:
       - backend
 
@@ -193,7 +193,7 @@ services:
     ports:
       - "5435:5432"
     volumes:
-      - postgres_order_data:/var/lib/postgresql/data
+      - postgres-order:/var/lib/postgresql/data
     networks:
       - backend
 
@@ -207,7 +207,7 @@ services:
     ports:
       - "5436:5432"
     volumes:
-      - postgres_inventory_data:/var/lib/postgresql/data
+      - postgres-inventory:/var/lib/postgresql/data
     networks:
       - backend
 
@@ -221,7 +221,7 @@ services:
     ports:
       - "5437:5432"
     volumes:
-      - postgres_payment_data:/var/lib/postgresql/data
+      - postgres-payment:/var/lib/postgresql/data
     networks:
       - backend
 
@@ -235,7 +235,7 @@ services:
     ports:
       - "5438:5432"
     volumes:
-      - postgres_notification_data:/var/lib/postgresql/data
+      - postgres-notification:/var/lib/postgresql/data
     networks:
       - backend
 
@@ -311,19 +311,17 @@ services:
       - backend
 
 volumes:
-  postgres_user_data:
+  postgres-user:
     driver: local
-  postgres_product_data:
+  postgres-product:
     driver: local
-  postgres_order_data:
+  postgres-order:
     driver: local
-  postgres_inventory_data:
+  postgres-inventory:
     driver: local
-  postgres_payment_data:
+  postgres-payment:
     driver: local
-  postgres_notification_data:
-    driver: local
-  pgadmin:
+  postgres-notification:
     driver: local
 
 networks:

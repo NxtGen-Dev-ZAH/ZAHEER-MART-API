@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 # Retry utility
-async def retry_async(func, retries=5, delay=2, *args, **kwargs):
+async def retry_async(func, retries=5, delay=2):
     for attempt in range(retries):
         try:
-            return await func(*args, **kwargs)
+            return await func()
         except Exception as e:
             logger.warning(f"Attempt {attempt + 1} failed: {e}")
             if attempt < retries - 1:

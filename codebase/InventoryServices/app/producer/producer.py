@@ -14,10 +14,10 @@ async def publish_inventory_update_stock_level(product_id: str, stock_level: int
         option=inventory_pb2.SelectOption.ADD,
     )
     serialized_message = message.SerializeToString()
-    await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_INVENTORY, product_id, serialized_message
+    await kafka.send_kafka_message(settings.KAFKA_TOPIC_INVENTORY, serialized_message)
+    logger.info(
+        f"Inventory update stock level message sent for product ID: {product_id}"
     )
-    logger.info(f"Inventory update message sent for product ID: {product_id}")
 
 
 async def publish_inventory_create(inventory_id, item: models.InventoryItemCreate):
@@ -30,9 +30,7 @@ async def publish_inventory_create(inventory_id, item: models.InventoryItemCreat
         option=inventory_pb2.SelectOption.CREATE,
     )
     serialized_message = message.SerializeToString()
-    await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_INVENTORY, inventory_id, serialized_message
-    )
+    await kafka.send_kafka_message(settings.KAFKA_TOPIC_INVENTORY, serialized_message)
     logger.info(f"Inventory create message sent for product ID: {inventory_id}")
 
 
@@ -45,9 +43,7 @@ async def publish_inventory_update(inventory_id: str, item: models.InventoryItem
         option=inventory_pb2.SelectOption.UPDATE,
     )
     serialized_message = message.SerializeToString()
-    await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_INVENTORY, inventory_id, serialized_message
-    )
+    await kafka.send_kafka_message(settings.KAFKA_TOPIC_INVENTORY, serialized_message)
     logger.info(f"Inventory update message sent for product ID: {inventory_id}")
 
 
@@ -58,9 +54,7 @@ async def publish_inventory_reduce(product_id: str, stock_level: int):
         option=inventory_pb2.SelectOption.REDUCE,
     )
     serialized_message = message.SerializeToString()
-    await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_INVENTORY, product_id, serialized_message
-    )
+    await kafka.send_kafka_message(settings.KAFKA_TOPIC_INVENTORY, serialized_message)
     logger.info(f"Inventory reduce message sent for product ID: {product_id}")
 
 
@@ -69,9 +63,7 @@ async def publish_inventory_check(product_id: str):
         product_id=product_id, option=inventory_pb2.SelectOption.CHECK
     )
     serialized_message = message.SerializeToString()
-    await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_INVENTORY, product_id, serialized_message
-    )
+    await kafka.send_kafka_message(settings.KAFKA_TOPIC_INVENTORY, serialized_message)
     logger.info(f"Inventory check message sent for product ID: {product_id}")
 
 
@@ -80,7 +72,5 @@ async def publish_product_deleted(inventory_id: str):
         inventory_id=inventory_id, option=inventory_pb2.SelectOption.DELETE
     )
     serialized_product = message.SerializeToString()
-    await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_INVENTORY, inventory_id, serialized_product
-    )
+    await kafka.send_kafka_message(settings.KAFKA_TOPIC_INVENTORY, serialized_product)
     logger.info(f"Product deleted message sent for product ID: {inventory_id}")

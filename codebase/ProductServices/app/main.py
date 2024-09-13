@@ -21,9 +21,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     await kafka.create_topic()
-    loop = asyncio.get_event_loop()
-    task = loop.create_task(start_consuming())
-    stock_task = loop.create_task(start_consuming_stock())
+    task = asyncio.create_task(start_consuming())
+    stock_task = asyncio.create_task(start_consuming_stock())
     try:
         yield
     finally:

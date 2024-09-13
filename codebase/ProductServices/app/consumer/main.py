@@ -21,7 +21,7 @@ async def handle_update_product(product_data: ProductUpdate, product_id: str):
     with Session(db.engine) as session:
         updated_product = await crud.update_product(session, product_id, product_data)
         logger.info(
-            f"======= updated yahoo in consumer ==={updated_product}===================="
+            f"======= updated yahoo in consumer ==== {updated_product}===================="
         )
         return updated_product
 
@@ -49,16 +49,6 @@ async def process_message(product: product_pb2.Product):
         logger.error(f"Error processing message: {e}")
 
 
-async def start_consuming():
-    try:
-        async for message in kafka.consume_messages(
-            settings.KAFKA_TOPIC_PRODUCT, settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT
-        ):
-            await process_message(message)
-    except Exception as e:
-        logger.error(f"Error in consumer: {e}")
-
-
 async def process_message_stock(new_msg: product_pb2.Inventory):
     with Session(db.engine) as session:
         product = await crud.get_product(session, new_msg.product_id)
@@ -71,16 +61,29 @@ async def process_message_stock(new_msg: product_pb2.Inventory):
                 session.commit()
 
 
+async def start_consuming():
+    try:
+        consumer = kafka.consume_messages(
+            settings.KAFKA_TOPIC_PRODUCT, settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT
+        )
+        async for message in consumer:
+            await process_message(message)
+    except Exception as e:
+        logger.error(f"Error in consumer: {e}")
+
+
 async def start_consuming_stock():
     try:
-        async for message in kafka.consume_messages_stock(
+        consumer = kafka.consume_messages_stock(
             settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK,
             settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT,
-        ):
+        )
+        async for message in consumer:
             await process_message_stock(message)
     except Exception as e:
         logger.error(f"Error in consumer: {e}")
 
 
-if __name__ == "__main__":
-    asyncio.run(start_consuming())
+# if __name__ == "__main__":
+#     asyncio.run(start_consuming())
+#     asyncio.run(start_consuming_stock())

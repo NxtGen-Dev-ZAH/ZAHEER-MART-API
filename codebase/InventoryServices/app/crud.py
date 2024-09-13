@@ -15,6 +15,8 @@ async def create_inventory_item(
         inventory_id=item.inventory_id,
         product_id=item.product_id,
         stock_level=item.stock_level,
+        sold_stock=item.sold_stock,
+        reserved_stock=item.reserved_stock,
     )
     session.add(new_item)
     session.commit()
@@ -49,21 +51,27 @@ async def update_inventory_item(
 ) -> Optional[InventoryItem]:
     db_item = await get_inventory_item(session, inventory_id)
     if db_item:
-        logger.info("----------------------------------inside the update message------------------------------------------------------")
+        logger.info(
+            "----------------------------------inside the update message------------------------------------------------------"
+        )
         new_product = InventoryItemUpdate(
             sold_stock=item_data.sold_stock,
             reserved_stock=item_data.reserved_stock,
             stock_level=item_data.stock_level,
         )
-        logger.info(f"============================================{new_product}======================")
+        logger.info(
+            f"============================================{new_product}======================"
+        )
         data = new_product.model_dump(exclude_unset=True)
         db_item.sqlmodel_update(data)
         session.add(db_item)
         session.commit()
-        session.refresh(db_item)    
+        session.refresh(db_item)
         logger.info("the inventory with" + inventory_id + "inventory id is updated ")
 
-        logger.info(f"============================================{db_item}======================")
+        logger.info(
+            f"============================================{db_item}======================"
+        )
         return db_item
     else:
         logger.error(f"Product with ID {inventory_id} not found.")

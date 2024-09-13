@@ -74,7 +74,7 @@ Thank you for your purchase! Your payment has been successfully processed. Your 
 async def start_consuming_payment():
     try:
         async for message in kafka.consume_message_payment(
-            settings.KAFKA_TOPIC_USER,
+            settings.KAFKA_TOPIC_PAYMENT,
             settings.KAFKA_CONSUMER_GROUP_ID_TO_CONSUME_PAYMENT_DONE,
         ):
             await process_message_payment(message)

@@ -18,8 +18,22 @@ async def publish_user_register(register: UserCreate):
             option=user_pb2.SelectOption.REGISTER,
         )
         serialized_user = user_proto.SerializeToString()
-        await kafka.send_and_wait(settings.KAFKA_TOPIC_USER, serialized_user)
-        return {"message": "User registration request sent successfully"}
+        await kafka.send_message(settings.KAFKA_TOPIC_USER, serialized_user)
+        logger.info("User registration request sent successfully")
+    except Exception as e:
+        logger.error(f"Failed to produce message: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+async def publish_user_delete(user_id: int):
+    try:
+        user_proto = user_pb2.User(
+            user_id=str(user_id),
+            option=user_pb2.SelectOption.DELETE,
+        )
+        serialized_user = user_proto.SerializeToString()
+        await kafka.send_message(settings.KAFKA_TOPIC_USER, serialized_user)
+        logger.info("User deletion request sent successfully")
     except Exception as e:
         logger.error(f"Failed to produce message: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

@@ -30,7 +30,9 @@ async def lifespan(app: FastAPI):
                 pass
 
 
-app: FastAPI = FastAPI(lifespan=lifespan)
+app: FastAPI = FastAPI(
+    lifespan=lifespan, dependencies=[Depends(auth.verify_access_token)]
+)
 
 app.include_router(router=user.user_router)
 

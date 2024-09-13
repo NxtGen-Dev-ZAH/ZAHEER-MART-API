@@ -11,9 +11,7 @@ async def publish_product_created(product: models.ProductBase):
     message = kafka.product_to_proto(product)
     message.option = product_pb2.SelectOption.CREATE
     serialized_product = message.SerializeToString()
-    await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_PRODUCT, product.product_id, serialized_product
-    )
+    await kafka.send_kafka_message(settings.KAFKA_TOPIC_PRODUCT, serialized_product)
     logger.info(f"Product created message sent for product ID: {product.product_id}")
 
 
@@ -29,9 +27,7 @@ async def publish_product_updated(product: models.ProductUpdate, product_id: str
     message = kafka.product_to_proto(product_base)
     message.option = product_pb2.SelectOption.UPDATE
     serialized_product = message.SerializeToString()
-    await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_PRODUCT, product_id, serialized_product
-    )
+    await kafka.send_kafka_message(settings.KAFKA_TOPIC_PRODUCT, serialized_product)
     logger.info(
         f"===============Product updated message sent for product ID: {product_id}==========================="
     )
@@ -42,9 +38,7 @@ async def publish_product_deleted(product_id: str):
         product_id=product_id, option=product_pb2.SelectOption.DELETE
     )
     serialized_product = message.SerializeToString()
-    await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_PRODUCT, product_id, serialized_product
-    )
+    await kafka.send_kafka_message(settings.KAFKA_TOPIC_PRODUCT, serialized_product)
     logger.info(f"Product deleted message sent for product ID: {product_id}")
 
 
@@ -56,6 +50,6 @@ async def publish_stock_update(product_id: str, new_stock: int):
     )
     serialized_product = message.SerializeToString()
     await kafka.send_kafka_message(
-        settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK, product_id, serialized_product
+        settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK, serialized_product
     )
     logger.info(f"Stock update message sent for product ID: {product_id}")

@@ -9,9 +9,11 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
 async def create_topic():
     admin_client = AIOKafkaAdminClient(bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}")
-    await admin_client.start()
+    await retry_async(admin_client.start)
     topic_list = [
         NewTopic(
             name=f"{(settings.KAFKA_TOPIC_INVENTORY).strip()}",
@@ -32,26 +34,27 @@ async def create_topic():
     finally:
         await admin_client.close()
 
-async def send_kafka_message(topic: str, key: str, value: bytes):
+
+async def send_kafka_message(topic: str, message):
     producer = AIOKafkaProducer(bootstrap_servers=settings.BOOTSTRAP_SERVER)
-    await retry_async(producer.start())
+    await retry_async(producer.start)
+    logger.info("IN PRODUCER IT IS RECIEVING THIS  " + str(message))
     try:
-        await producer.send_and_wait(
-            topic, key=key.encode("utf-8"), value=value
-        )
+        await producer.send_and_wait(topic, message)
         logger.info(f"Message sent to topic {topic}")
     finally:
         await producer.stop()
-async def send_producer_message(topic: str, message:str):
+
+
+async def send_producer_message(topic: str, message: str):
     producer = AIOKafkaProducer(bootstrap_servers=settings.BOOTSTRAP_SERVER)
-    await retry_async(producer.start())
+    await retry_async(producer.start)
     try:
-        await producer.send_and_wait(
-            topic, message
-        )
+        await producer.send_and_wait(topic, message)
         logger.info(f"Message sent to topic {topic}")
     finally:
         await producer.stop()
+
 
 async def consume_messages(topic: str, group_id: str):
     consumer = AIOKafkaConsumer(
@@ -60,7 +63,7 @@ async def consume_messages(topic: str, group_id: str):
         group_id=group_id,
         auto_offset_reset="earliest",
     )
-    await retry_async(consumer.start())
+    await retry_async(consumer.start)
     try:
         async for msg in consumer:
             logger.info(f"Message received from consumer: {msg}")
@@ -74,6 +77,7 @@ async def consume_messages(topic: str, group_id: str):
     finally:
         await consumer.stop()
 
+
 async def consume_messages_product(topic: str, group_id: str):
     consumer = AIOKafkaConsumer(
         topic,
@@ -81,7 +85,7 @@ async def consume_messages_product(topic: str, group_id: str):
         group_id=group_id,
         auto_offset_reset="earliest",
     )
-    await retry_async(consumer.start())
+    await retry_async(consumer.start)
     try:
         async for msg in consumer:
             logger.info(f"Message received from consumer: {msg}")
@@ -94,7 +98,8 @@ async def consume_messages_product(topic: str, group_id: str):
                 logger.error(f"Error processing message: {e}")
     finally:
         await consumer.stop()
-        
+
+
 async def consume_messages_inventory_check(topic: str, group_id: str):
     consumer = AIOKafkaConsumer(
         topic,
@@ -102,7 +107,7 @@ async def consume_messages_inventory_check(topic: str, group_id: str):
         group_id=group_id,
         auto_offset_reset="earliest",
     )
-    await retry_async(consumer.start())
+    await retry_async(consumer.start)
     try:
         async for msg in consumer:
             logger.info(f"Message received from consumer: {msg}")
@@ -116,10 +121,11 @@ async def consume_messages_inventory_check(topic: str, group_id: str):
     finally:
         await consumer.stop()
 
+
 async def retry_async(coro, max_retries=3, delay=1):
     for attempt in range(max_retries):
         try:
-            return await coro
+            return await coro()
         except Exception as e:
             if attempt == max_retries - 1:
                 raise

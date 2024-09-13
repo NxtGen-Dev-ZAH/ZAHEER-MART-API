@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 # Retry utility
-async def retry_async(func, retries=5, delay=2, *args, **kwargs):
+async def retry_async(func, retries=5, delay=2):
     for attempt in range(retries):
         try:
-            return await func(*args, **kwargs)
+            return await func()
         except Exception as e:
             logger.warning(f"Attempt {attempt + 1} failed: {e}")
             if attempt < retries - 1:
@@ -47,7 +47,7 @@ async def consume_message_from_user_service():
         group_id=f"{settings.KAFKA_CONSUMER_GROUP_ID_FOR_RESPONSE_FROM_USER}",
         auto_offset_reset="earliest",
     )
-    await retry_async(consumer.start())
+    await retry_async(consumer.start)
     try:
         async for msg in consumer:
             logger.info(f"message from consumer in producer  : {msg}")
@@ -69,7 +69,7 @@ async def consume_messages_order(topic: str, consumerid: str):
         group_id=consumerid,
         auto_offset_reset="earliest",
     )
-    await retry_async(consumer.start())
+    await retry_async(consumer.start)
     try:
         async for msg in consumer:
             logger.info(f"message from producer in consumer  : {msg}")
@@ -91,7 +91,7 @@ async def consume_messages_payment(topic: str, consumerid: str):
         group_id=consumerid,
         auto_offset_reset="earliest",
     )
-    await retry_async(consumer.start())
+    await retry_async(consumer.start)
     try:
         async for msg in consumer:
             logger.info(f"message from producer in consumer  : {msg}")
@@ -113,7 +113,7 @@ async def consume_message_from_inventory_check():
         group_id=f"{settings.KAFKA_CONSUMER_GROUP_ID_FROM_INVENTORY_CHECK}",
         auto_offset_reset="earliest",
     )
-    await retry_async(consumer.start())
+    await retry_async(consumer.start)
     try:
         async for msg in consumer:
             logger.info(
@@ -135,7 +135,7 @@ async def consume_message_from_inventory_check():
 #  Function to produce message.
 async def send_message_producer(topic, message):
     producer = AIOKafkaProducer(bootstrap_servers=settings.BOOTSTRAP_SERVER)
-    await retry_async(producer.start())
+    await retry_async(producer.start)
     logger.info("IN PRODUCER IT IS RECIEVING THIS  " + str(message))
     try:
         await producer.send_and_wait(topic, message)

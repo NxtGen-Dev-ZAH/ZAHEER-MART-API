@@ -23,7 +23,7 @@ class Payment(PAYMENTmodel, table=True):
 
 
 class PaymentRequest(SQLModel):
-    amount: float
+    amount: int
     card_number: int
     exp_month: int
     exp_year: int

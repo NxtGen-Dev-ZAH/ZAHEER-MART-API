@@ -1,0 +1,1 @@
+print("areej is gandi bachi")

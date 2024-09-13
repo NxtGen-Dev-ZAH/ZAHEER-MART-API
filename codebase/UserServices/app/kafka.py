@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 # Retry utility
-async def retry_async(func, retries=5, delay=2, *args, **kwargs):
+async def retry_async(func, retries=5, delay=2):
     for attempt in range(retries):
         try:
-            return await func(*args, **kwargs)
+            return await func()
         except Exception as e:
             logger.error(f"Attempt {attempt + 1} failed: {e}")
             if attempt < retries - 1:
@@ -31,6 +31,11 @@ async def create_topic():
     topic_list = [
         NewTopic(
             name=f"{(settings.KAFKA_TOPIC_USER).strip()}",
+            num_partitions=2,
+            replication_factor=1,
+        ),
+        NewTopic(
+            name=f"{(settings.KAFKA_TOPIC_GET).strip()}",
             num_partitions=2,
             replication_factor=1,
         ),
@@ -53,26 +58,26 @@ async def create_topic():
         await admin_client.close()
 
 
-# async def consume_message_response():
-#     consumer = AIOKafkaConsumer(
-#     f"{settings.KAFKA_TOPIC_USER}",
-#     bootstrap_servers= f"{settings.BOOTSTRAP_SERVER}",
-#     group_id= f"{settings.KAFKA_CONSUMER_GROUP_ID_FOR_USER}",
-#     auto_offset_reset='earliest'
-#     )
-#     await retry_async(consumer.start)
-#     try:
-#         async for msg in consumer:
-#             logger.info(f"message from consumer in producer  : {msg}")
-#             try:
-#                 new_msg = user_pb2.User()
-#                 new_msg.ParseFromString(msg.value)
-#                 logger.info(f"new_msg on producer side:{new_msg}")
-#                 return new_msg
-#             except Exception as e:
-#                 logger.error(f"Error Processing Message: {e} ")
-#     finally:
-#         await consumer.stop()
+async def consume_message_response():
+    consumer = AIOKafkaConsumer(
+        f"{settings.KAFKA_TOPIC_GET}",
+        bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}",
+        group_id=f"{settings.KAFKA_CONSUMER_GROUP_ID_FOR_USER_GET}",
+        auto_offset_reset="earliest",
+    )
+    await retry_async(consumer.start)
+    try:
+        async for msg in consumer:
+            logger.info(f"message from consumer in producer  : {msg}")
+            try:
+                new_msg = user_pb2.User()
+                new_msg.ParseFromString(msg.value)
+                logger.info(f"new_msg on producer side:{new_msg}")
+                return new_msg
+            except Exception as e:
+                logger.error(f"Error Processing Message: {e} ")
+    finally:
+        await consumer.stop()
 
 
 async def consume_messages_user(topic, consumer_id):

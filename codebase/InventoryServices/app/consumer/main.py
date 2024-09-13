@@ -11,7 +11,7 @@ from app.models import (
 )
 import asyncio
 
-from codebase.NotificationServices.app.kafka import produce_message
+from app.kafka import send_producer_message
 
 
 logging.basicConfig(level=logging.INFO)
@@ -169,7 +169,7 @@ async def process_message_inventory_check(new_msg: inventory_pb2.Order):
                             stock_level=inventory.stock_level,
                         )
                         serialized_inventory = inventory_proto.SerializeToString()
-                        await produce_message(
+                        await send_producer_message(
                             settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK, serialized_inventory
                         )
                 else:
@@ -202,7 +202,7 @@ async def process_message_inventory_check(new_msg: inventory_pb2.Order):
             serialized_inventory_check_response = (
                 inventory_check_proto.SerializeToString()
             )
-            await produce_message(
+            await send_producer_message(
                 settings.KAFKA_TOPIC_INVENTORY_CHECK_RESPONSE,
                 serialized_inventory_check_response,
             )
@@ -225,7 +225,7 @@ async def process_message_product(product: inventory_pb2.Product):
                 session.commit()
                 session.refresh(inventory_item)
                 logger.info(
-                    f"Created inventory item for product ID: {product.product_id}"
+                    f"Created inventory item for product ID: {product.product_id} successfully"
                 )
 
             elif product.option == inventory_pb2.SelectOption.DELETE:
@@ -253,10 +253,11 @@ async def process_message_product(product: inventory_pb2.Product):
 
 async def start_consuming():
     try:
-        async for message in kafka.consume_messages(
+        consumer = kafka.consume_messages(
             settings.KAFKA_TOPIC_INVENTORY,
             settings.KAFKA_CONSUMER_GROUP_ID_FOR_INVENTORY,
-        ):
+        )
+        async for message in consumer:
             await process_message(message)
     except Exception as e:
         logger.error(f"Error in consumer: {e}")
@@ -264,10 +265,11 @@ async def start_consuming():
 
 async def start_consuming_product():
     try:
-        async for message in kafka.consume_messages_product(
+        consumer = kafka.consume_messages_product(
             settings.KAFKA_TOPIC_GET_PRODUCT,
             settings.KAFKA_CONSUMER_GROUP_ID_FOR_PRODUCT,
-        ):
+        )
+        async for message in consumer:
             await process_message_product(message)
     except Exception as e:
         logger.error(f"Error in consumer: {e}")
@@ -275,14 +277,15 @@ async def start_consuming_product():
 
 async def start_consuming_inventory_check():
     try:
-        async for message in kafka.consume_messages_inventory_check(
+        consumer = kafka.consume_messages_inventory_check(
             settings.KAFKA_TOPIC_INVENTORY_CHECK_REQUEST,
             settings.KAFKA_CONSUMER_GROUP_ID_FOR_INVENTORY_CHECK,
-        ):
+        )
+        async for message in consumer:
             await process_message_inventory_check(message)
     except Exception as e:
         logger.error(f"Error in consumer: {e}")
 
 
-if __name__ == "__main__":
-    asyncio.run(start_consuming())
+# if __name__ == "__main__":
+#     asyncio.run(start_consuming())
