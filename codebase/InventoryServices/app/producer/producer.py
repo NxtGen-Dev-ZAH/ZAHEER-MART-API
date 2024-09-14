@@ -1,3 +1,4 @@
+#producuer : producer.py
 from app import kafka, models, settings
 from app import inventory_pb2
 import logging

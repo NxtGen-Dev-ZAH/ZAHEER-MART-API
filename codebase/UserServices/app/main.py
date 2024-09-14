@@ -1,3 +1,4 @@
+# main.py
 from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException
 from contextlib import asynccontextmanager
@@ -30,9 +31,7 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
 
-
 app = FastAPI(lifespan=lifespan)
-
 
 @app.get("/")
 async def read_root():

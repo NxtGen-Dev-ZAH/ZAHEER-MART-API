@@ -1,3 +1,4 @@
+# consumer:main.py
 from sqlmodel import Session
 from app import kafka, settings, crud
 from app import db
@@ -285,7 +286,6 @@ async def start_consuming_inventory_check():
             await process_message_inventory_check(message)
     except Exception as e:
         logger.error(f"Error in consumer: {e}")
-
 
 # if __name__ == "__main__":
 #     asyncio.run(start_consuming())

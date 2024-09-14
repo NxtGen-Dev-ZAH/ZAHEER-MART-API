@@ -1,3 +1,4 @@
+# main.py
 import asyncio
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -10,7 +11,6 @@ from app.router import user
 import stripe
 
 import logging
-
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -87,6 +87,13 @@ async def create_checkout_session(checkout_request: CheckoutRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.get("/success")
+async def success_page():
+    return {"message": "Payment Successful"}
+
+@app.get("/cancel")
+async def cancel_page():
+    return {"message": "Payment Cancelled"}
 
 # from fastapi import FastAPI, Depends, HTTPException, status
 # from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm

@@ -22,35 +22,36 @@ def fetch_openapi_specs():
     services = [
         {
             "name": "user-service",
-            "url": "http://host.docker.internal:8007/openapi.json",
+            "url": "http://user:8007/openapi.json",
             "base_route": "/user-service",
         },
         {
             "name": "product-service",
-            "url": "http://host.docker.internal:8002/openapi.json",
+            "url": "http://product:8002/openapi.json",
             "base_route": "/product-service",
         },
         {
             "name": "order-service",
-            "url": "http://host.docker.internal:8003/openapi.json",
+            "url": "http://order:8003/openapi.json",
             "base_route": "/order-service",
         },
         {
             "name": "notification-service",
-            "url": "http://host.docker.internal:8004/openapi.json",
+            "url": "http://notification:8004/openapi.json",
             "base_route": "/notification-service",
         },
         {
             "name": "inventory-service",
-            "url": "http://host.docker.internal:8005/openapi.json",
+            "url": "http://inventory:8005/openapi.json",
             "base_route": "/inventory-service",
         },
         {
             "name": "payment-service",
-            "url": "http://host.docker.internal:8006/openapi.json",
+            "url": "http://payment:8006/openapi.json",
             "base_route": "/payment-service",
         },
     ]
+
     specs = []
     for service in services:
         try:
@@ -60,7 +61,6 @@ def fetch_openapi_specs():
             )
             response.raise_for_status()
             spec = response.json()
-            # Add base route to all paths
             spec_with_base_route = add_base_route_to_paths(spec, service["base_route"])
             specs.append(spec_with_base_route)
         except requests.exceptions.RequestException as e:
@@ -68,6 +68,7 @@ def fetch_openapi_specs():
             raise HTTPException(
                 status_code=500, detail=f"Error fetching {service['name']} spec: {e}"
             )
+
     return specs
 
 

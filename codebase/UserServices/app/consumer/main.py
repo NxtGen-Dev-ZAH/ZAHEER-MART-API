@@ -1,3 +1,4 @@
+# consumer:main.py
 from typing import Union
 from sqlmodel import select, Session
 from app import settings, user_pb2, db, kafka, auth, models, crud

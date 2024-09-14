@@ -1,13 +1,10 @@
+#crud.py
 from sqlmodel import Session, select
 from app.models import InventoryItemBase, InventoryItem, InventoryItemUpdate
 from typing import List, Optional
-
 import logging
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
 async def create_inventory_item(
     session: Session, item: InventoryItemBase
 ) -> InventoryItem:
@@ -25,15 +22,12 @@ async def create_inventory_item(
     session.refresh(new_item)
     return new_item
 
-
 async def get_inventory_item_by_product(
     session: Session, product_id: str
 ) -> Optional[InventoryItem]:
     return session.exec(
         select(InventoryItem).where(InventoryItem.product_id == product_id)
     ).first()
-
-
 async def get_inventory_item(
     session: Session, inventory_id: str
 ) -> Optional[InventoryItem]:
@@ -41,11 +35,8 @@ async def get_inventory_item(
         select(InventoryItem).where(InventoryItem.inventory_id == inventory_id)
     ).first()
 
-
 async def get_all_inventory_items(session: Session) -> List[InventoryItem]:
     return list(session.exec(select(InventoryItem)).all())
-
-
 async def update_inventory_item(
     session: Session, inventory_id: str, item_data: InventoryItemUpdate
 ) -> Optional[InventoryItem]:

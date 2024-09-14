@@ -1,3 +1,4 @@
+# consumer:main.py
 from app.stripe.payment import create_payment
 from sqlmodel import  select, Session
 from app import  crud, kafka, settings, payment_pb2, db, models
@@ -14,7 +15,6 @@ logger = logging.getLogger(__name__)
 #     with Session(db.engine) as session:
 #         created_product = await crud.create_product_crud(session, order_id)
 #         return created_product
-
 
 async def process_order_message(message):
     if message.option == payment_pb2.SelectOption.CREATE:

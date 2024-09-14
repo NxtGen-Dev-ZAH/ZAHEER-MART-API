@@ -1,3 +1,4 @@
+# consumer:main.py
 from sqlmodel import Session
 from app import settings
 from aiokafka import AIOKafkaConsumer  # type: ignore
@@ -5,21 +6,15 @@ from app import notification_pb2, kafka, handle_email, db
 import logging
 
 from app.models import Notification
-
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
 async def save_notification(notification: Notification):
     with Session(db.engine) as session:
         session.add(notification)
         session.commit()
         session.refresh(notification)
         logger.info(f"Notification saved: {notification.id}")
-
-
 async def process_message_user(new_msg: notification_pb2.User):
     if new_msg.option == notification_pb2.SelectOption.REGISTER:
         body = f"""Hi {new_msg.username},
@@ -38,7 +33,6 @@ Welcome to Online Mart! You have successfully signed in. Explore our wide range 
         )
         await save_notification(notification)
 
-
 async def start_consuming_user():
     try:
         async for message in kafka.consume_message_user(
@@ -48,7 +42,6 @@ async def start_consuming_user():
             await process_message_user(message)
     except Exception as e:
         logger.error(f"Error in consumer: {e}")
-
 
 async def process_message_payment(new_msg: notification_pb2.Payment):
     if new_msg.payment_status == notification_pb2.PaymentStatus.PAID:

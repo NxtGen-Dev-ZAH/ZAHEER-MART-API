@@ -1,3 +1,4 @@
+# consumer:main.py
 from app import kafka
 from app.kafka import (
     consume_message_from_inventory_check,

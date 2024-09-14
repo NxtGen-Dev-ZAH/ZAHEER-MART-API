@@ -14,6 +14,7 @@ services:
     depends_on:
       - postgres-user
       - broker
+    image: zaheer771/user-service:latest
     ports:
       - "8007:8007"
     networks:
@@ -32,6 +33,8 @@ services:
       - broker
     ports:
       - "8002:8002"
+    image: zaheer771/product-service:latest
+
     networks:
       - backend
 
@@ -48,6 +51,7 @@ services:
       - broker
     ports:
       - "8003:8003"
+    image: zaheer771/order-service:latest
     networks:
       - backend
 
@@ -62,6 +66,7 @@ services:
     depends_on:
       - postgres-notification
       - broker
+    image: zaheer771/notification-service:latest
     ports:
       - "8004:8004"
     networks:
@@ -75,6 +80,7 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ./InventoryServices:/code
+    image: zaheer771/inventory-service:latest
     depends_on:
       - postgres-inventory
       - broker
@@ -98,6 +104,7 @@ services:
       - "8006:8006"
     networks:
       - backend
+    image: zaheer771/payment-service:latest
 
   # Dapr sidecars
   user-service-dapr:
@@ -294,21 +301,21 @@ services:
       - backend
 
   # Kong API Gateway
-  kong:
-    image: kong:latest
-    container_name: kong
-    environment:
-      KONG_DATABASE: "off"
-      KONG_PROXY_ACCESS_LOG: /dev/stdout
-      KONG_ADMIN_ACCESS_LOG: /dev/stdout
-      KONG_PROXY_ERROR_LOG: /dev/stderr
-      KONG_ADMIN_ERROR_LOG: /dev/stderr
-      KONG_ADMIN_LISTEN: 0.0.0.0:8001
-    ports:
-      - "8008:8000"
-      - "8009:8001"
-    networks:
-      - backend
+  # kong:
+  #   image: kong:latest
+  #   container_name: kong
+  #   environment:
+  #     KONG_DATABASE: "off"
+  #     KONG_PROXY_ACCESS_LOG: /dev/stdout
+  #     KONG_ADMIN_ACCESS_LOG: /dev/stdout
+  #     KONG_PROXY_ERROR_LOG: /dev/stderr
+  #     KONG_ADMIN_ERROR_LOG: /dev/stderr
+  #     KONG_ADMIN_LISTEN: 0.0.0.0:8001
+  #   ports:
+  #     - "8008:8000"
+  #     - "8009:8001"
+  #   networks:
+  #     - backend
 
 volumes:
   postgres-user:
@@ -327,3 +334,6 @@ volumes:
 networks:
   backend:
     driver: bridge
+  martapi-net:
+    name: martapi-net
+    external: true

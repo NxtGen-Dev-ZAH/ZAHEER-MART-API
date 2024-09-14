@@ -1,3 +1,4 @@
+# main.py
 import asyncio
 from contextlib import asynccontextmanager
 import logging
@@ -28,9 +29,7 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
 
-
 app: FastAPI = FastAPI(lifespan=lifespan)
-
 
 @app.get("/")
 async def read_root():

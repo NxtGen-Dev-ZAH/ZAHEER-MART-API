@@ -1,0 +1,52 @@
+_format_version: "2.1"
+_transform: true
+
+services:
+  - name: specs-combiner
+    url: http://specs-combiner:9000
+    routes:
+      - name: specs-combiner-route
+        paths:
+          - /specs-combiner
+
+  - name: user-service
+    url: http://user:8007
+    routes:
+      - name: user-service-route
+        paths:
+          - /user-service
+
+  - name: product-service
+    url: http://product:8002
+    routes:
+      - name: product-service-route
+        paths:
+          - /product-service
+
+  - name: order-service
+    url: http://order:8003
+    routes:
+      - name: order-service-route
+        paths:
+          - /order-service
+
+  - name: notification-service
+    url: http://notification:8004
+    routes:
+      - name: notification-service-route
+        paths:
+          - /notification-service
+
+  - name: inventory-service
+    url: http://inventory:8005
+    routes:
+      - name: inventory-service-route
+        paths:
+          - /inventory-service
+
+  - name: payment-service
+    url: http://payment:8006
+    routes:
+      - name: payment-service-route
+        paths:
+          - /payment-service

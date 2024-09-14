@@ -1,12 +1,10 @@
+#crud.py
 import logging
 from typing import Optional, List
 from app.models import OrdersBase, OrdersCreate, Orders, OrdersUpdate
 from sqlmodel import Session, select
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
 # Create a new order
 async def create_order(
     session: Session, order_data: OrdersCreate, user_id: str, product_id: str
@@ -36,22 +34,15 @@ async def get_order(session: Session, order_id: str) -> Optional[Orders]:
     else:
         return order
 
-
 # Retrieve all orders for a given user
-
-
 async def get_orders_by_user(session: Session, user_id: str) -> List[Orders]:
     return list(session.exec(select(Orders).where(Orders.user_id == user_id)).all())
-
 
 # Retrieve all orders
 async def get_all_orders(session: Session) -> List[Orders]:
     return list(session.exec(select(Orders)).all())
 
-
 # Update an order
-
-
 async def update_order(
     session: Session, order_id: str, order_data: OrdersUpdate
 ) -> Optional[Orders]:
@@ -72,8 +63,6 @@ async def update_order(
         return db_order
     else:
         logger.error(f"Product with ID {order_id} not found.")
-
-
 # Delete an order
 async def delete_order(session: Session, order_id: str) -> Optional[Orders]:
     db_order = await get_order(session, order_id)

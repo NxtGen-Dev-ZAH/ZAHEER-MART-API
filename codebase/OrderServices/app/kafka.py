@@ -1,3 +1,4 @@
+# kafka.py
 from app import settings
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer  # type: ignore
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic  # type: ignore
@@ -8,7 +9,6 @@ import logging
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 # Retry utility
 async def retry_async(func, retries=5, delay=2):
@@ -21,8 +21,6 @@ async def retry_async(func, retries=5, delay=2):
                 await asyncio.sleep(delay)
             else:
                 raise
-
-
 async def create_topic():
     admin_client = AIOKafkaAdminClient(bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}")
     await retry_async(admin_client.start)
@@ -37,8 +35,6 @@ async def create_topic():
         logger.error("Error creating topics:: {e}")
     finally:
         await admin_client.close()
-
-
 #  Function to consume  messages from user service
 async def consume_message_from_user_service():
     consumer = AIOKafkaConsumer(
@@ -60,8 +56,6 @@ async def consume_message_from_user_service():
                 logger.error(f"Error Processing Message: {e} ")
     finally:
         await consumer.stop()
-
-
 async def consume_messages_order(topic: str, consumerid: str):
     consumer = AIOKafkaConsumer(
         topic,
@@ -82,8 +76,6 @@ async def consume_messages_order(topic: str, consumerid: str):
                 logger.error(f"Error Processing Message: {e} ")
     finally:
         await consumer.stop()
-
-
 async def consume_messages_payment(topic: str, consumerid: str):
     consumer = AIOKafkaConsumer(
         topic,
@@ -104,8 +96,6 @@ async def consume_messages_payment(topic: str, consumerid: str):
                 logger.error(f"Error Processing Message: {e} ")
     finally:
         await consumer.stop()
-
-
 async def consume_message_from_inventory_check():
     consumer = AIOKafkaConsumer(
         f"{settings.KAFKA_TOPIC_INVENTORY_CHECK_RESPONSE }",
@@ -130,8 +120,6 @@ async def consume_message_from_inventory_check():
                 logger.error(f"Error Processing Message: {e} ")
     finally:
         await consumer.stop()
-
-
 #  Function to produce message.
 async def send_message_producer(topic, message):
     producer = AIOKafkaProducer(bootstrap_servers=settings.BOOTSTRAP_SERVER)

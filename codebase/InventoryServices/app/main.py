@@ -1,3 +1,4 @@
+# main.py
 from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel import Session
 from app import models, crud, kafka, settings
@@ -11,8 +12,6 @@ from typing import Annotated
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
@@ -30,15 +29,10 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
 
-
 app = FastAPI(lifespan=lifespan)
-
-
 @app.get("/")
 async def read_root():
     return {"Hello": "Welcome to Inventory Service ."}
-
-
 @app.get("/inventory/{inventory_item}", response_model=models.InventoryItem)
 async def see_inventory_item(
     inventory_item: str, session: Annotated[Session, Depends(get_session)]
@@ -49,14 +43,10 @@ async def see_inventory_item(
     if inventoryitem is None:
         raise HTTPException(status_code=404, detail="Inventory item not found")
     return inventoryitem
-
-
 @app.get("/inventory/", response_model=list[models.InventoryItemBase])
 async def get_all_inventory_items(session: Annotated[Session, Depends(get_session)]):
     items = await crud.get_all_inventory_items(session)
     return items
-
-
 @app.post("/inventory/create/")
 async def create_inventory_item(item: models.InventoryItemCreate):
     await producer.publish_inventory_create(item.inventory_id, item)
@@ -64,7 +54,6 @@ async def create_inventory_item(item: models.InventoryItemCreate):
         "message": "Inventory creation request sent. YOU IDIOT",
         "inventory_id": item.inventory_id,
     }
-
     # async for message in kafka.consume_messages(
     #     settings.KAFKA_TOPIC_INVENTORY,
     #     settings.KAFKA_CONSUMER_GROUP_ID_FOR_INVENTORY,
